@@ -1,0 +1,39 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, build output
+*.test
+*.out
+
+# Output of the go command
+/build/
+bin/
+*.o
+*.a
+
+# Vendor directory
+/vendor/
+
+# Dependency directories (for example, dep)
+Gopkg.lock
+Gopkg.toml
+
+# IDE and editor specific files
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Logs
+*.log
+
+# Coverage files
+*.cover
+*.cov
+
+# Temporary files
+*.tmp
+*.temp
