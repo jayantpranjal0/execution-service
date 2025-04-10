@@ -22,7 +22,7 @@ func ConnectMongoDB(uri string) error {
 
     // Connect to MongoDB
     client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
-    if err != nil {
+    if (err != nil) {
         log.Printf("Error connecting to MongoDB: %v", err)
         return fmt.Errorf("failed to connect to MongoDB: %w", err)
     }
@@ -33,7 +33,7 @@ func ConnectMongoDB(uri string) error {
 
     // Verify the connection
     err = client.Ping(pingCtx, nil)
-    if err != nil {
+    if (err != nil) {
         log.Printf("Error pinging MongoDB: %v", err)
         return fmt.Errorf("failed to ping MongoDB: %w", err)
     }
@@ -44,7 +44,10 @@ func ConnectMongoDB(uri string) error {
 
 // GetCollection returns a MongoDB collection
 func GetCollection(databaseName, collectionName string) *mongo.Collection {
-	return MongoClient.Database(databaseName).Collection(collectionName)
+    if MongoClient == nil {
+        panic("MongoClient is not initialized. Call ConnectMongoDB first.")
+    }
+    return MongoClient.Database(databaseName).Collection(collectionName)
 }
 
 // DisconnectMongoDB closes the MongoDB connection

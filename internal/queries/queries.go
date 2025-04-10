@@ -12,7 +12,7 @@ import (
 
 func AddEntry(collection *mongo.Collection, entry models.ExecutedJob) error {
 	// Insert the entry into the collection
-	result, err := collection.InsertOne(context.TODO(), entry)
+	result, err := collection.InsertOne(context.TODO(),entry)
 	if err != nil {
 		log.Printf("Error adding entry: %v", err)
 		return err

@@ -107,7 +107,7 @@ func (w *Worker) AssignJob(job Job) {
 
 	if resp.StatusCode != http.StatusOK {
 		// panic("Failed to assign job") // Handle error appropriately in production code
-		log.Printf("Failed to assign job to worker %s: %s", w.ID, resp.Status)
+		log.Printf("Failed to assign job to worker %s: %s", w.ID, resp.Status, resp.Body)
 		return
 	} else {
 		log.Printf("Job assigned to worker %s successfully", w.ID)
@@ -135,7 +135,7 @@ func (w *Worker) IsFree() bool {
 			log.Printf("Invalid job response format for worker %s", w.ID)
 			return false
 		}
-		jobID, ok := jobMap["job_id"].(string)
+		jobID, ok := jobMap["JobID"].(string)
 		if !ok {
 			log.Printf("Invalid job ID format for worker %s", w.ID)
 			return false

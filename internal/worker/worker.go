@@ -59,13 +59,9 @@ func (w *Worker) GetID() string {
 }
 
 func (w *Worker) handleExecuteJob(wr http.ResponseWriter, req *http.Request) {
+	log.Printf("Worker %s: Received job execution request", w.ID)
 	if req.Method != http.MethodPost {
 		http.Error(wr, "Invalid request method", http.StatusMethodNotAllowed)
-		return
-	}
-	w.JobID = req.Header.Get("job_id")
-	if w.JobID == "" {
-		http.Error(wr, "Missing job_id in header", http.StatusBadRequest)
 		return
 	}
 
@@ -76,7 +72,7 @@ func (w *Worker) handleExecuteJob(wr http.ResponseWriter, req *http.Request) {
 		w.JobID = ""
 		return
 	}
-	jobID, ok := jobPayload["job_id"].(string)
+	jobID, ok := jobPayload["JobID"].(string)
 	if !ok {
 		http.Error(wr, "Invalid job payload", http.StatusBadRequest)
 		w.JobID = ""
@@ -86,6 +82,8 @@ func (w *Worker) handleExecuteJob(wr http.ResponseWriter, req *http.Request) {
 	log.Printf("Worker %s: Received job: %v", w.ID, jobPayload)
 
 	// Execute the job
+	wr.WriteHeader(http.StatusOK)
+	wr.Write([]byte("Job execution started successfully"))
 	if err := w.ExecuteJob(jobPayload); err != nil {
 		// http.Error(wr, "Failed to execute job", http.StatusInternalServerError)
 		if !ok {
@@ -96,6 +94,7 @@ func (w *Worker) handleExecuteJob(wr http.ResponseWriter, req *http.Request) {
 		markJobCompleted(jobID, "error", err.Error())
 		return
 	}
+	log.Printf("Worker %s: Job %s executed successfully with proof", w.ID, jobID)
 
 	markJobCompleted(jobID, "success", "")
 	log.Printf("Worker %s: Job %s executed successfully", w.ID, jobID)
@@ -108,19 +107,22 @@ func (w *Worker) ExecuteJob(jobPayload map[string]interface{}) error {
 
 	// Sleep for a random amount of milliseconds to simulate processing
 	// Fetch the Dockerfile from the Firebase S3 bucket
-	dockerFileURL := jobPayload["dockerfile_url"].(string)
+	dockerFileURL := jobPayload["DockerfileReference"].(string)
+	log.Print("Worker %s: Fetching Dockerfile from URL: %s", w.ID, dockerFileURL)
+	// Fetch the Dockerfile from the provided URL
 	resp, err := http.Get(dockerFileURL)
 	if err != nil {
-		log.Printf("Worker %s: Failed to fetch Dockerfile: %v", w.ID, err)
+		log.Printf("Worker %s: Failed to fetch Dockerfile from URL: %v", w.ID, err)
 		return err
 	}
 	defer resp.Body.Close()
-
+	log.Printf("Worker %s: Received response from Dockerfile URL: %d", w.ID, resp.StatusCode)
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Worker %s: Received non-OK response while fetching Dockerfile: %d", w.ID, resp.StatusCode)
 		return err
 	}
-
+	log.Print("Worker %s: Successfully fetched Dockerfile from URL", w.ID)
+	log.Print("creating temporary file for Dockerfile")
 	// Save the Dockerfile to a temporary location
 	tempFile, err := os.CreateTemp("", "dockerfile-*.Dockerfile")
 	if err != nil {
@@ -140,17 +142,17 @@ func (w *Worker) ExecuteJob(jobPayload map[string]interface{}) error {
 		log.Printf("Worker %s: Failed to close temporary Dockerfile: %v", w.ID, err)
 		return err
 	}
-
+	log.Printf("Worker %s: Dockerfile saved to temporary file: %s", w.ID, tempFile.Name())
 	// Execute the Dockerfile
 	// Use the Docker CLI to build and run the Dockerfile
-	dockerImageName := "job-image-" + jobPayload["job_id"].(string)
+	dockerImageName := "job-image-" + jobPayload["JobID"].(string)
 
 	// Build the Docker image
 	buildCmd := exec.Command("docker", "build", "-t", dockerImageName, "-f", tempFile.Name(), ".")
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 
-	log.Printf("Worker %s: Building Docker image %s", w.ID, dockerImageName)
+	// log.Printf("Worker %s: Building Docker image %s", w.ID, dockerImageName)
 	if err := buildCmd.Run(); err != nil {
 		log.Printf("Worker %s: Failed to build Docker image: %v", w.ID, err)
 		return err
@@ -180,7 +182,8 @@ func (w *Worker) ExecuteJob(jobPayload map[string]interface{}) error {
 func markJobCompleted(job_id string, status string, error string) {
 	// This function should update the job status in the database
 	// You can use the database queries package to perform this operation
-	collection := database.GetCollection("hackathons", "executed_jobs")
+	log.Printf("status: %s", status)
+	collection := database.GetCollection("hackathon", "executed_jobs")
 	err := queries.AddEntry(collection, models.ExecutedJob{
 		ID:                      primitive.NewObjectID(),
 		JobID:                   job_id,
@@ -190,8 +193,8 @@ func markJobCompleted(job_id string, status string, error string) {
 		Status:                  status,
 		ErrorMessage:            error,
 	})
-
-
+	
+	log.Printf("Worker: Marking job %s as completed with status: %s", job_id, status)
 	if err != nil {
 		log.Printf("Error updating job status: %v", err)
 	}

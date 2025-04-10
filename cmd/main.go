@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	// "execution-service/internal/database"
+	"execution-service/internal/database"
 )
 
 var logger *zap.Logger
@@ -35,15 +35,15 @@ func main() {
 	logger.Info("Logger initialized")
 
 	// Setup Database Connection
-	// mongoURI := os.Getenv("MONGO_URI")
-	// if mongoURI == "" {
-	// 	logger.Fatal("MONGO_URI environment variable is not set")
-	// }
-	// if err := database.ConnectMongoDB(mongoURI); err != nil {
-	// 	logger.Fatal("Failed to connect to MongoDB", zap.Error(err))
-	// }
-	// defer database.DisconnectMongoDB()
-	// logger.Info("Connected to MongoDB")
+	mongoURI := os.Getenv("MONGO_URI")
+	if mongoURI == "" {
+		logger.Fatal("MONGO_URI environment variable is not set")
+	}
+	if err := database.ConnectMongoDB(mongoURI); err != nil {
+		logger.Fatal("Failed to connect to MongoDB", zap.Error(err))
+	}
+	defer database.DisconnectMongoDB()
+	logger.Info("Connected to MongoDB")
 
 	// Start node
 	// TODO: Every node starts as a worker and then only one node becomes a coordinator through some consensus algorithm. Also, let the cluster owner decide the coordinator as a config

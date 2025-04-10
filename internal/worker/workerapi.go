@@ -14,7 +14,7 @@ func (w *Worker) handleHealthRequest(wr http.ResponseWriter, req *http.Request) 
 func (w *Worker) handleJobRequest(wr http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodGet {
 		jobID := w.JobID // Assuming getJobID() is a method that retrieves the current job ID
-		response := map[string]string{"job_id": jobID}
+		response := map[string]string{"JobID": jobID}
 		wr.Header().Set("Content-Type", "application/json")
 		wr.WriteHeader(http.StatusOK)
 		json.NewEncoder(wr).Encode(response)
