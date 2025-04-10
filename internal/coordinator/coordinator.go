@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -38,12 +39,14 @@ func (c *Coordinator) GetID() string {
 }
 
 func (c *Coordinator) Start() error {
+	fmt.Printf("Coordinator started\n")
 	go c.monitorWorkers()
+	// c.logger.Info("Coordinator started")
 	// setUpWorkersFromConfig()
 	return nil
 }
 
-func NewCoordinator() *Coordinator {
+func NewCoordinator(config *viper.Viper) *Coordinator {
 	return &Coordinator{
 		workers:     WorkerManager{
 			workers: make(map[string]*Worker),

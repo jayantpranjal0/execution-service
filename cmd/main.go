@@ -14,6 +14,8 @@ import (
 	"execution-service/internal/database"
 )
 
+var logger *zap.Logger
+
 func main() {
 	// Load configuration
     viper.SetConfigName("config")
@@ -25,10 +27,10 @@ func main() {
 	}
 
 	// Initialize logger
-	logger, err := zap.NewProduction()
-	if err != nil {
-		panic(err)
-	}
+	logger, _ = zap.NewProduction()
+	// if err != nil {
+	// 	panic(err)
+	// }
 	defer logger.Sync() // flushes buffer, if any
 	logger.Info("Logger initialized")
 
@@ -41,11 +43,17 @@ func main() {
 
 	// Start node
 	// TODO: Every node starts as a worker and then only one node becomes a coordinator through some consensus algorithm. Also, let the cluster owner decide the coordinator as a config
+	logger.Info("Starting node...")
 	node,err:= NewNode(viper.GetViper())
 	if err != nil {
 		logger.Fatal("Failed to create node", zap.Error(err))
 	}
-	// node.logStart();
+
+	err = node.Start()
+	if err != nil {
+		logger.Fatal("Failed to start node", zap.Error(err))
+	}
+	logger.Info("Node started", zap.String("nodeID", node.GetID()))
 	
 	// Wait for termination signal
 	stop := make(chan os.Signal, 1)
@@ -63,11 +71,12 @@ func main() {
 // It initializes either a Worker or Coordinator node based on the "node.type" configuration.
 func NewNode(config *viper.Viper) (node.NodeInterface, error) {
 	nodeType := config.GetString("node.type")
+	logger.Info("Node type", zap.String("type", nodeType))
 	switch nodeType {
 		case "worker":
-			return worker.NewWorker(), nil
+			return worker.NewWorker(config), nil
 		case "coordinator":
-			return coordinator.NewCoordinator(), nil
+			return coordinator.NewCoordinator(config), nil
 		default:
 			return nil, fmt.Errorf("unknown node type: %s", nodeType)
 	}

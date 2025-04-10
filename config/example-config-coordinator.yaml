@@ -1,0 +1,9 @@
+node:
+  type: "worker"
+  id: "node-1"
+  address: "localhost:8083"
+
+logging:
+  level: info
+  format: json
+  output: stdout
