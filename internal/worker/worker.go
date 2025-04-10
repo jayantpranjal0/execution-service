@@ -5,9 +5,11 @@ import (
 	"execution-service/internal/database"
 	"execution-service/internal/models"
 	"execution-service/internal/queries"
+	"io"
 	"log"
-	"math/rand"
 	"net/http"
+	"os"
+	"os/exec"
 	"time"
 
 	"github.com/spf13/viper"
@@ -71,6 +73,10 @@ func (w *Worker) handleExecuteJob(wr http.ResponseWriter, req *http.Request) {
 		return
 	}
 	jobID, ok := jobPayload["job_id"].(string)
+	if !ok {
+		http.Error(wr, "Invalid job payload", http.StatusBadRequest)
+		return
+	}
 
 	log.Printf("Worker %s: Received job: %v", w.ID, jobPayload)
 
@@ -94,10 +100,70 @@ func (w *Worker) ExecuteJob(jobPayload map[string]interface{}) error {
 	log.Printf("Worker %s: Executing job with payload: %v", w.ID, jobPayload)
 
 	// Sleep for a random amount of milliseconds to simulate processing
-	randomDuration := time.Duration(rand.Intn(1000)) * time.Millisecond
-	time.Sleep(randomDuration)
+	// Fetch the Dockerfile from the Firebase S3 bucket
+	dockerFileURL := jobPayload["dockerfile_url"].(string)
+	resp, err := http.Get(dockerFileURL)
+	if err != nil {
+		log.Printf("Worker %s: Failed to fetch Dockerfile: %v", w.ID, err)
+		return err
+	}
+	defer resp.Body.Close()
 
-	// TODO: Write code to run a Dockerfile
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Worker %s: Received non-OK response while fetching Dockerfile: %d", w.ID, resp.StatusCode)
+		return err
+	}
+
+	// Save the Dockerfile to a temporary location
+	tempFile, err := os.CreateTemp("", "dockerfile-*.Dockerfile")
+	if err != nil {
+		log.Printf("Worker %s: Failed to create temporary file for Dockerfile: %v", w.ID, err)
+		return err
+	}
+	defer os.Remove(tempFile.Name())
+
+	_, err = io.Copy(tempFile, resp.Body)
+	if err != nil {
+		log.Printf("Worker %s: Failed to save Dockerfile to temporary file: %v", w.ID, err)
+		return err
+	}
+
+	// Close the file to ensure it's written to disk
+	if err := tempFile.Close(); err != nil {
+		log.Printf("Worker %s: Failed to close temporary Dockerfile: %v", w.ID, err)
+		return err
+	}
+
+	// Execute the Dockerfile
+	// Use the Docker CLI to build and run the Dockerfile
+	dockerImageName := "job-image-" + jobPayload["job_id"].(string)
+
+	// Build the Docker image
+	buildCmd := exec.Command("docker", "build", "-t", dockerImageName, "-f", tempFile.Name(), ".")
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+
+	log.Printf("Worker %s: Building Docker image %s", w.ID, dockerImageName)
+	if err := buildCmd.Run(); err != nil {
+		log.Printf("Worker %s: Failed to build Docker image: %v", w.ID, err)
+		return err
+	}
+
+	// Run the Docker container
+	runCmd := exec.Command("docker", "run", "--rm", dockerImageName)
+	runCmd.Stdout = os.Stdout
+	runCmd.Stderr = os.Stderr
+
+	log.Printf("Worker %s: Running Docker container for image %s", w.ID, dockerImageName)
+	if err := runCmd.Run(); err != nil {
+		log.Printf("Worker %s: Failed to run Docker container: %v", w.ID, err)
+		return err
+	}
+
+	log.Printf("Worker %s: Successfully executed Dockerfile", w.ID)
+
+	log.Printf("Worker %s: Successfully fetched and saved Dockerfile to %s", w.ID, tempFile.Name())
+
 	// Example: You could use a library like "github.com/docker/docker/client" to interact with Docker
 	log.Printf("Worker %s: Job execution completed", w.ID)
 

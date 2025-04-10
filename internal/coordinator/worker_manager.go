@@ -79,7 +79,13 @@ func (wm *WorkerManager) CheckWorkerHealth(timeout time.Duration) {
 }
 
 func (w *Worker) IsHealthy() bool {
-	return w.Status == "active"
+	resp, err := http.Get(w.Address + "/health")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	return resp.StatusCode == http.StatusOK
 }
 
 func (w *Worker) AssignJob(job Job) {
