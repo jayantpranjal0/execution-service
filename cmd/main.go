@@ -1,8 +1,17 @@
 package main
 
 import (
-	"go.uber.org/zap"
+	"execution-service/internal/coordinator"
+	"execution-service/internal/node"
+	"execution-service/internal/worker"
+	"os"
+	"os/signal"
+	"syscall"
+	"fmt"
+
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
+	"execution-service/internal/database"
 )
 
 func main() {
@@ -23,6 +32,43 @@ func main() {
 	defer logger.Sync() // flushes buffer, if any
 	logger.Info("Logger initialized")
 
-	// Start coordinator
+	// Setup Database Connection
+	if err := database.ConnectMongoDB(viper.GetString("database.uri")); err != nil {
+		logger.Fatal("Failed to connect to MongoDB", zap.Error(err))
+	}
+	defer database.DisconnectMongoDB()
+	logger.Info("Connected to MongoDB")
 
+	// Start node
+	// TODO: Every node starts as a worker and then only one node becomes a coordinator through some consensus algorithm. Also, let the cluster owner decide the coordinator as a config
+	node,err:= NewNode(viper.GetViper())
+	if err != nil {
+		logger.Fatal("Failed to create node", zap.Error(err))
+	}
+	// node.logStart();
+	
+	// Wait for termination signal
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	<-stop
+	logger.Info("Termination signal received, shutting down...")
+
+	// Implement graceful shutdown logic here
+	node.Stop()
+	logger.Info("Coordinator stopped")
+}
+
+// NewNode creates a new Node instance based on the configuration provided by viper.
+// It initializes either a Worker or Coordinator node based on the "node.type" configuration.
+func NewNode(config *viper.Viper) (node.NodeInterface, error) {
+	nodeType := config.GetString("node.type")
+	switch nodeType {
+		case "worker":
+			return worker.NewWorker(), nil
+		case "coordinator":
+			return coordinator.NewCoordinator(), nil
+		default:
+			return nil, fmt.Errorf("unknown node type: %s", nodeType)
+	}
 }
