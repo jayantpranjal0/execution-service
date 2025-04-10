@@ -14,9 +14,11 @@ import (
 )
 
 type Job struct {
-	ID       string
-	Task     string
-	WorkerID string
+	ID        string
+	JobID     string
+	WorkerID  string
+	DockerfileReference string
+	JobStatus string
 }
 
 type Config struct {
@@ -63,15 +65,29 @@ func (c *Coordinator) fetchJobsFromKafka() {
 		}
 
 		// Parse the job message
-		var job Job
-		if err := json.Unmarshal([]byte(jobMessage), &job); err != nil {
+		var jobJson any
+		if err := json.Unmarshal([]byte(jobMessage), &jobJson); err != nil {
 			log.Print("Failed to unmarshal job message", err)
 			continue
 		}
 
+		jobMap, ok := jobJson.(map[string]interface{})
+		if !ok {
+			log.Print("Failed to cast job message to map[string]interface{}")
+			continue
+		}
+		
+		job := Job{
+			ID: "1",
+			JobID: jobMap["job_id"].(string),
+			WorkerID: "",
+			DockerfileReference: jobMap["dockerfile_reference"].(string),
+			JobStatus: "pending",
+		}
+
 		// // Enqueue the job into the jobQueue
-		// c.jobQueue <- job
-		// c.logger.Info("Job added to queue", zap.String("job_id", job.ID))
+		c.jobQueue <- job
+		log.Print("Job enqueued", job.JobID, job.DockerfileReference)
 	}
 }
 
@@ -100,13 +116,13 @@ func (c *Coordinator) monitorWorkers() {
 	for {
 		time.Sleep(c.healthCheck)
 		c.mu.Lock()
-		for id, worker := range c.workers.workers {
-			if !worker.IsHealthy() {
-				fmt.Print("Worker %s is unhealthy, removing from the list\n", id)
-				c.workers.RemoveWorker(id)
-			} else {
-				fmt.Printf("Worker %s is healthy\n", id)
-			}
+		for _, worker := range c.workers.workers {
+			// if !worker.IsHealthy() {
+			// 	fmt.Print("Worker %s is unhealthy, removing from the list\n", id)
+			// 	c.workers.RemoveWorker(id)
+			// } else {
+			// 	fmt.Printf("Worker %s is healthy\n", id)
+			// }
 			if worker.IsFree() {
 				select {
 				case job := <-c.jobQueue:

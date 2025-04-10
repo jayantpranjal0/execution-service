@@ -1,10 +1,12 @@
 package coordinator
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
+	"log"	
 )
 
 // Worker represents a worker node in the system.
@@ -91,13 +93,27 @@ func (w *Worker) IsHealthy() bool {
 func (w *Worker) AssignJob(job Job) {
 	// Logic to assign a job to the worker
 	w.Status = "busy"
-	// Simulate job assignment
-	time.Sleep(1 * time.Second)
+	log.Print("Assigning job to worker", w.ID, job.ID)
+	reqBody, err := json.Marshal(job)
+	if err != nil {
+		panic(err) // Handle error appropriately in production code
+	}
+
+	resp, err := http.Post(w.Address+"/execute", "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		panic(err) // Handle error appropriately in production code
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		panic("Failed to assign job") // Handle error appropriately in production code
+	}
+
 	w.Status = "active"
 }
 
 func (w *Worker) IsFree() bool {
-	return w.Status == "active"
+	return true
 }
 
 
