@@ -48,11 +48,15 @@ func (c *Coordinator) Start() error {
 
 func NewCoordinator(config *viper.Viper) *Coordinator {
 	return &Coordinator{
-		workers:     WorkerManager{
-			workers: make(map[string]*Worker),
-		},
+		workers:     InitializeWorkersFromConfig(config),
 		mu:          sync.Mutex{},
-		// healthCheck: coordinatorConfig.HealthCheckInterval,
+		healthCheck: func() time.Duration {
+			duration, err := time.ParseDuration(config.GetString("workers.heartbeat_interval"))
+			if err != nil {
+				panic(fmt.Sprintf("invalid duration for workers.heartbeat_interval: %v", err))
+			}
+			return duration
+		}(),
 		// jobQueue:	make(chan Job, coordinatorConfig.JobQueueSize),
 		// workerTimeout: coordinatorConfig.WorkerTimeout,
 	}
@@ -80,4 +84,30 @@ func (c *Coordinator) monitorWorkers() {
 		}
 		c.mu.Unlock()
 	}
+}
+
+
+func InitializeWorkersFromConfig(config *viper.Viper) WorkerManager {
+	workerManager := NewWorkerManager()
+
+	workers := config.Get("workers.list").([]interface{})
+
+	for _, worker := range workers {
+		workerMap := worker.(map[string]interface{}) // Convert to map[string]interface{}
+        id := workerMap["id"].(string)
+        name := workerMap["name"].(string)
+        address := workerMap["address"].(string)
+
+        // Create a new worker and add it to the WorkerManager
+        newWorker := Worker {
+			ID: id,
+			Name: name,
+			Address: address,
+			AssignedJob: nil,
+		}
+		newWorker.updateHealth()
+		newWorker.UpdateJobStatus()
+        workerManager.AddWorker(&newWorker)
+	}
+	return *workerManager
 }

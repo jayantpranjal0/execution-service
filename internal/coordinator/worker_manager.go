@@ -1,6 +1,8 @@
 package coordinator
 
 import (
+	"encoding/json"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -8,7 +10,8 @@ import (
 // Worker represents a worker node in the system.
 type Worker struct {
 	ID         string
-	IPAddress  string
+	Name       string
+	Address    string
 	Status     string
 	AssignedJob *Job
 	LastHeartbeat time.Time
@@ -28,15 +31,10 @@ func NewWorkerManager() *WorkerManager {
 }
 
 // AddWorker adds a new worker to the manager.
-func (wm *WorkerManager) AddWorker(id, ipAddress string) {
+func (wm *WorkerManager) AddWorker(w *Worker) {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
-	wm.workers[id] = &Worker{
-		ID:         id,
-		IPAddress:  ipAddress,
-		Status:     "active",
-		LastHeartbeat: time.Now(),
-	}
+	wm.workers[w.ID] = w
 }
 
 // RemoveWorker removes a worker from the manager.
@@ -94,4 +92,43 @@ func (w *Worker) AssignJob(job Job) {
 
 func (w *Worker) IsFree() bool {
 	return w.Status == "active"
+}
+
+
+func (w *Worker) updateHealth() error {
+	resp, err := http.Get(w.Address + "/health")
+	if err != nil {
+		w.Status = "inactive"
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		w.Status = "active"
+	} else {
+		w.Status = "inactive"
+	}
+	return nil
+}
+
+func (w* Worker) UpdateJobStatus() error {
+	resp, err := http.Get(w.Address + "/job")
+	if err != nil {
+
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		// Logic to update the assigned job
+		// For example, parse the response body to get job details
+		var job Job
+		if err := json.NewDecoder(resp.Body).Decode(&job); err != nil {
+			return err
+		}
+		w.AssignedJob = &job
+	} else {
+		w.AssignedJob = nil
+	}
+	return nil
 }

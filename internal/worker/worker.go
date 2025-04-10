@@ -35,6 +35,8 @@ func (w *Worker) Start() error {
 
 	// Define HTTP handlers
 	http.HandleFunc("/execute", w.handleExecuteJob)
+	http.HandleFunc("/health", w.handleHealthRequest)
+	http.HandleFunc("/job", w.handleJobRequest)
 
 	// Start the HTTP server
 	go func() {
