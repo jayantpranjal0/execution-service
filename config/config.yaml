@@ -12,14 +12,14 @@ workers:
       id: "worker-1"
       type: "worker"
       address: "http://localhost:8080"
-    - name: "worker-2"
-      id: "worker-2"
-      type: "worker"
-      address: "http://localhost:8081"
-    - name: "worker-3"
-      id: "worker-3"
-      type: "worker"
-      address: "http://localhost:8082"
+    # - name: "worker-2"
+    #   id: "worker-2"
+    #   type: "worker"
+    #   address: "http://localhost:8081"
+    # - name: "worker-3"
+    #   id: "worker-3"
+    #   type: "worker"
+    #   address: "http://localhost:8082"
 
 kafka:
   brokers:

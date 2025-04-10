@@ -16,13 +16,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type Config struct {
-	Address string // Address where the worker listens (e.g., ":8080")
-}
 
 type Worker struct {
 	ID      string
 	Address string
+	JobID  	string
 }
 
 func NewWorker(config *viper.Viper) *Worker {
@@ -65,16 +63,23 @@ func (w *Worker) handleExecuteJob(wr http.ResponseWriter, req *http.Request) {
 		http.Error(wr, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
+	w.JobID = req.Header.Get("job_id")
+	if w.JobID == "" {
+		http.Error(wr, "Missing job_id in header", http.StatusBadRequest)
+		return
+	}
 
 	// Parse the job payload
 	var jobPayload map[string]interface{}
 	if err := json.NewDecoder(req.Body).Decode(&jobPayload); err != nil {
 		http.Error(wr, "Failed to parse job payload", http.StatusBadRequest)
+		w.JobID = ""
 		return
 	}
 	jobID, ok := jobPayload["job_id"].(string)
 	if !ok {
 		http.Error(wr, "Invalid job payload", http.StatusBadRequest)
+		w.JobID = ""
 		return
 	}
 
@@ -86,13 +91,15 @@ func (w *Worker) handleExecuteJob(wr http.ResponseWriter, req *http.Request) {
 		if !ok {
 			log.Printf("Worker %s: Invalid job_id in payload", w.ID)
 			http.Error(wr, "Invalid job_id in payload", http.StatusBadRequest)
-			return
+			w.JobID = ""
 		}
 		markJobCompleted(jobID, "error", err.Error())
 		return
 	}
 
 	markJobCompleted(jobID, "success", "")
+	log.Printf("Worker %s: Job %s executed successfully", w.ID, jobID)
+	w.JobID = ""
 }
 
 func (w *Worker) ExecuteJob(jobPayload map[string]interface{}) error {

@@ -116,13 +116,13 @@ func (c *Coordinator) monitorWorkers() {
 	for {
 		time.Sleep(c.healthCheck)
 		c.mu.Lock()
-		for _, worker := range c.workers.workers {
-			// if !worker.IsHealthy() {
-			// 	fmt.Print("Worker %s is unhealthy, removing from the list\n", id)
-			// 	c.workers.RemoveWorker(id)
-			// } else {
-			// 	fmt.Printf("Worker %s is healthy\n", id)
-			// }
+		for id, worker := range c.workers.workers {
+			if !worker.IsHealthy() {
+				log.Printf("Worker %s is unhealthy, removing from the list\n", id)
+				c.workers.RemoveWorker(id)
+			} else {
+				// fmt.Printf("Worker %s is healthy\n", id)
+			}
 			if worker.IsFree() {
 				select {
 				case job := <-c.jobQueue:

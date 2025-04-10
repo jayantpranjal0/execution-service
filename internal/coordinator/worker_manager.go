@@ -106,32 +106,65 @@ func (w *Worker) AssignJob(job Job) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		panic("Failed to assign job") // Handle error appropriately in production code
+		// panic("Failed to assign job") // Handle error appropriately in production code
+		log.Printf("Failed to assign job to worker %s: %s", w.ID, resp.Status)
+		return
+	} else {
+		log.Printf("Job assigned to worker %s successfully", w.ID)
 	}
 
 	w.Status = "active"
 }
 
 func (w *Worker) IsFree() bool {
-	return true
-}
-
-
-func (w *Worker) updateHealth() error {
-	resp, err := http.Get(w.Address + "/health")
+	resp, err := http.Get(w.Address + "/job")
 	if err != nil {
-		w.Status = "inactive"
-		return err
+		log.Printf("Error checking job status for worker %s: %v", w.ID, err)
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusOK {
-		w.Status = "active"
-	} else {
-		w.Status = "inactive"
+		var job any
+		if err := json.NewDecoder(resp.Body).Decode(&job); err != nil {
+			log.Printf("Error decoding job response for worker %s: %v", w.ID, err)
+			return false
+		}
+		jobMap, ok := job.(map[string]interface{})
+		if !ok {
+			log.Printf("Invalid job response format for worker %s", w.ID)
+			return false
+		}
+		jobID, ok := jobMap["job_id"].(string)
+		if !ok {
+			log.Printf("Invalid job ID format for worker %s", w.ID)
+			return false
+		}
+		if jobID == "" {
+			return true // No job assigned
+		}
+		return false // Job is assigned
 	}
-	return nil
+	log.Printf("Error checking job status for worker %s: %v", w.ID, err)
+	return false
 }
+
+
+// func (w *Worker) updateHealth() error {
+// 	resp, err := http.Get(w.Address + "/health")
+// 	if err != nil {
+// 		w.Status = "inactive"
+// 		return err
+// 	}
+// 	defer resp.Body.Close()
+
+// 	if resp.StatusCode == http.StatusOK {
+// 		w.Status = "active"
+// 	} else {
+// 		w.Status = "inactive"
+// 	}
+// 	return nil
+// }
 
 func (w* Worker) UpdateJobStatus() error {
 	resp, err := http.Get(w.Address + "/job")
